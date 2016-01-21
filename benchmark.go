@@ -10,7 +10,7 @@ type FlowRunner interface {
 	InitCollector(chan *Metric)
 }
 
-// Operation conatins info about an HTTP request
+// Operation contains information about an HTTP request
 type Operation struct {
 	Name   string
 	Method string
@@ -33,7 +33,7 @@ type Benchmark struct {
 	syncFeed       chan int
 }
 
-// NewBenchmark retuns a new instance of Benchmark
+// NewBenchmark returns a new instance of Benchmark
 func NewBenchmark(flow FlowRunner) *Benchmark {
 	statsConsumers := []chan *Metric{}
 
@@ -58,6 +58,7 @@ func NewBenchmark(flow FlowRunner) *Benchmark {
 	return bench
 }
 
+// 1 to n channel
 func (b *Benchmark) feedConsumers() {
 	// Basically it sends the output of a channel to the input of n-channels
 	for metric := range b.statsCollector {
@@ -91,7 +92,7 @@ func (b *Benchmark) Run() {
 		<-fi
 	}
 
-	// There are no more metrics to be send, so we need to nitify the feeder
+	// There are no more metrics to be send, so we need to notify the feeder
 	// that no more data will be sent
 	close(b.statsCollector)
 
@@ -103,6 +104,7 @@ func (b *Benchmark) Run() {
 		close(channel)
 	}
 
+	// All channels are closed and no more data will be generated
 	for _, consumer := range regConsumers {
 		consumer.Finalize()
 	}
