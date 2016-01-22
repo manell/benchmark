@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"log"
 	"time"
 )
 
@@ -37,14 +38,7 @@ type Benchmark struct {
 func NewBenchmark(flow FlowRunner) *Benchmark {
 	statsConsumers := []chan *Metric{}
 
-	for _, consumer := range regConsumers {
-		c := make(chan *Metric, 4096)
-		statsConsumers = append(statsConsumers, c)
-		go consumer.Run(c)
-	}
-
 	statsCollector := make(chan *Metric, 4096)
-	flow.InitCollector(statsCollector)
 
 	bench := &Benchmark{
 		statsCollector: statsCollector,
@@ -73,7 +67,16 @@ func (b *Benchmark) feedConsumers() {
 
 // Run executes the benchmark
 func (b *Benchmark) Run() {
-	// Connect channels
+	for _, consumer := range regConsumers {
+		c := make(chan *Metric, 4096)
+		b.statsConsumers = append(b.statsConsumers, c)
+		go consumer.Run(c, b.C)
+	}
+
+	// Connect the collector with the flow
+	b.flow.InitCollector(b.statsCollector)
+
+	// Connect the collector with consumers
 	go b.feedConsumers()
 
 	fi := make(chan int)
@@ -81,7 +84,9 @@ func (b *Benchmark) Run() {
 	for j := 0; j < b.C; j++ {
 		go func(j, number int) {
 			for i := 0; i < number; i++ {
-				b.flow.RunFlow(i, j)
+				if err := b.flow.RunFlow(i, j); err != nil {
+					log.Fatal(err)
+				}
 			}
 			fi <- 1
 		}(j, b.N)
@@ -92,7 +97,7 @@ func (b *Benchmark) Run() {
 		<-fi
 	}
 
-	// There are no more metrics to be send, so we need to notify the feeder
+	// There are no more metrics to send, so we need to notify the feeder
 	// that no more data will be sent
 	close(b.statsCollector)
 
