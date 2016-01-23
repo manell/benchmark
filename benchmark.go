@@ -7,7 +7,7 @@ import (
 
 // FlowRunner is an interface that represents the ability to run a workflow
 type FlowRunner interface {
-	RunFlow(int, int) error
+	RunFlow() error
 	InitCollector(chan *Metric)
 }
 
@@ -79,21 +79,20 @@ func (b *Benchmark) Run() {
 	// Connect the collector with consumers
 	go b.feedConsumers()
 
-	fi := make(chan int)
+	fi := make(chan int, b.N)
+
+	workerFeed := make(chan int, b.N)
 
 	for j := 0; j < b.C; j++ {
-		go func(j, number int) {
-			for i := 0; i < number; i++ {
-				if err := b.flow.RunFlow(i, j); err != nil {
-					log.Fatal(err)
-				}
-			}
-			fi <- 1
-		}(j, b.N)
+		go b.runWorker(workerFeed, fi)
+	}
+
+	for i := 0; i < b.N; i++ {
+		workerFeed <- 1
 	}
 
 	// Wait until all requests finalize
-	for j := 0; j < b.C; j++ {
+	for j := 0; j < b.N; j++ {
 		<-fi
 	}
 
@@ -113,4 +112,14 @@ func (b *Benchmark) Run() {
 	for _, consumer := range regConsumers {
 		consumer.Finalize()
 	}
+}
+
+func (b *Benchmark) runWorker(iterations chan int, waitSync chan int) {
+	for _ = range iterations {
+		if err := b.flow.RunFlow(); err != nil {
+			log.Fatal(err)
+		}
+		waitSync <- 1
+	}
+
 }
