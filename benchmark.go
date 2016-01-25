@@ -7,8 +7,7 @@ import (
 
 // FlowRunner is an interface that represents the ability to run a workflow
 type FlowRunner interface {
-	RunFlow() error
-	InitCollector(chan *Metric)
+	RunFlow(*Client) error
 }
 
 // Operation contains information about an HTTP request
@@ -26,12 +25,13 @@ type Metric struct {
 }
 
 type Benchmark struct {
-	statsCollector chan *Metric
-	statsConsumers []chan *Metric
-	flow           FlowRunner
-	C              int
-	N              int
-	syncFeed       chan int
+	statsCollector    chan *Metric
+	statsConsumers    []chan *Metric
+	flow              FlowRunner
+	C                 int
+	N                 int
+	syncFeed          chan int
+	DisableKeepAlives bool
 }
 
 // NewBenchmark returns a new instance of Benchmark
@@ -73,9 +73,6 @@ func (b *Benchmark) Run() {
 		go consumer.Run(c, b.C)
 	}
 
-	// Connect the collector with the flow
-	b.flow.InitCollector(b.statsCollector)
-
 	// Connect the collector with consumers
 	go b.feedConsumers()
 
@@ -83,6 +80,7 @@ func (b *Benchmark) Run() {
 
 	workerFeed := make(chan int, b.N)
 
+	// Start C workers
 	for j := 0; j < b.C; j++ {
 		go b.runWorker(workerFeed, fi)
 	}
@@ -90,6 +88,7 @@ func (b *Benchmark) Run() {
 	for i := 0; i < b.N; i++ {
 		workerFeed <- 1
 	}
+	close(workerFeed)
 
 	// Wait until all requests finalize
 	for j := 0; j < b.N; j++ {
@@ -116,7 +115,9 @@ func (b *Benchmark) Run() {
 
 func (b *Benchmark) runWorker(iterations chan int, waitSync chan int) {
 	for _ = range iterations {
-		if err := b.flow.RunFlow(); err != nil {
+		// lets create a new client for each worker
+		cli := NewClient(b.statsCollector, b.DisableKeepAlives)
+		if err := b.flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
 		waitSync <- 1

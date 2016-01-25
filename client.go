@@ -7,19 +7,27 @@ import (
 
 // Client runs HTTP requests and collects metrics
 type Client struct {
-	collector chan *Metric
+	Collector chan *Metric
+	Client    *http.Client
 }
 
-// InitCollector configures the collector that will be used to send statistics
-func (c *Client) InitCollector(collector chan *Metric) {
-	c.collector = collector
+//  NewClient returns a new instance of a Client
+func NewClient(collector chan *Metric, keepAlive bool) *Client {
+	tp := &http.Transport{
+		MaxIdleConnsPerHost: 16,
+		DisableKeepAlives:   keepAlive,
+	}
+
+	client := &http.Client{Transport: tp}
+
+	return &Client{Client: client, Collector: collector}
 }
 
 // Do is a wrap in top of http.Client that execute requests and collects metrics
-func (c *Client) Do(name string, req *http.Request, client *http.Client) (*http.Response, error) {
+func (c *Client) Do(name string, req *http.Request) (*http.Response, error) {
 	startTime := time.Now()
 
-	resp, err := client.Do(req)
+	resp, err := c.Client.Do(req)
 
 	stat := &Metric{
 		StartTime: startTime,
@@ -31,7 +39,7 @@ func (c *Client) Do(name string, req *http.Request, client *http.Client) (*http.
 		FinalTime: time.Now(),
 	}
 
-	c.collector <- stat
+	c.Collector <- stat
 
 	return resp, err
 }

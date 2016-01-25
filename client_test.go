@@ -8,17 +8,13 @@ import (
 )
 
 func TestDo(t *testing.T) {
-	cli := &Client{}
-
 	coll := make(chan *Metric, 1)
-	cli.InitCollector(coll)
+	cli := NewClient(coll, false)
 
 	response := "I'm the backend"
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(response))
 	}))
-
-	client := &http.Client{}
 
 	tests := []struct {
 		Name   string
@@ -36,7 +32,7 @@ func TestDo(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		resp, err := cli.Do(test.Name, req, client)
+		resp, err := cli.Do(test.Name, req)
 		if err != nil {
 			t.Fatal(err)
 		}
