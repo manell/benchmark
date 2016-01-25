@@ -29,6 +29,7 @@ type Metric struct {
 	StartTime time.Time
 	Operation *Operation
 	FinalTime time.Time
+	Duration  float64
 }
 
 type Benchmark struct {
@@ -85,7 +86,7 @@ func (b *Benchmark) Run() {
 	for _, consumer := range regConsumers {
 		c := make(chan *Metric, 4096)
 		b.statsConsumers = append(b.statsConsumers, c)
-		go consumer.Run(c, b.C)
+		go consumer.Run(c, b.N, b.C)
 	}
 
 	// Connect the collector with consumers.

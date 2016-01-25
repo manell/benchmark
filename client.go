@@ -29,6 +29,11 @@ func (c *Client) Do(name string, req *http.Request) (*http.Response, error) {
 
 	resp, err := c.Client.Do(req)
 
+	fiTime := time.Now()
+
+	duration := fiTime.UnixNano() - startTime.UnixNano()
+	durationMs := float64(duration) / float64(time.Millisecond)
+
 	stat := &Metric{
 		StartTime: startTime,
 		Operation: &Operation{
@@ -37,6 +42,7 @@ func (c *Client) Do(name string, req *http.Request) (*http.Response, error) {
 			Path:   req.URL.Path,
 		},
 		FinalTime: time.Now(),
+		Duration:  durationMs,
 	}
 
 	c.Collector <- stat

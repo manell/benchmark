@@ -3,7 +3,7 @@ package benchmark
 // Consumer is an interface that represnets the ability to consume metrics and do
 // some stuff with them
 type Consumer interface {
-	Run(chan *Metric, int)
+	Run(chan *Metric, int, int)
 	Finalize()
 }
 

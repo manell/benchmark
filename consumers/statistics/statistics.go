@@ -2,7 +2,6 @@ package statistics
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/manell/benchmark"
 	"github.com/montanaflynn/stats"
@@ -22,14 +21,11 @@ type Statistics struct {
 	concurrency int
 }
 
-func (s *Statistics) Run(collector chan *benchmark.Metric, concurrency int) {
+func (s *Statistics) Run(collector chan *benchmark.Metric, iterations, concurrency int) {
 	s.concurrency = concurrency
 
 	for metric := range collector {
-		duration := metric.FinalTime.UnixNano() - metric.StartTime.UnixNano()
-		durationMs := float64(duration) / float64(time.Millisecond)
-
-		s.data[*metric.Operation] = append(s.data[*metric.Operation], durationMs)
+		s.data[*metric.Operation] = append(s.data[*metric.Operation], metric.Duration)
 	}
 	s.sync <- 1
 }
@@ -41,7 +37,7 @@ func (s *Statistics) Finalize() {
 
 		mean, _ := stats.Mean(times)
 		meanConc := mean / float64(s.concurrency)
-		rps := 1 / (meanConc / 1000)
+		rps := 1 / (meanConc / 1e3)
 
 		fmt.Printf("Requests per second: %f [#/ms] (mean)\n", rps)
 
