@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	n = flag.Int("n", 0, "number of requests")
+	n = flag.Int("n", 1, "number of requests")
 	c = flag.Int("c", 1, "number of concurrent workers")
 	k = flag.Bool("k", false, "reuse TCP connections")
 )
@@ -60,7 +60,7 @@ func NewBenchmark(flow FlowRunner) *Benchmark {
 		flow:              flow,
 		C:                 *c,
 		N:                 *n,
-		DisableKeepAlives: *k,
+		DisableKeepAlives: !*k,
 		syncFeed:          make(chan int),
 	}
 
@@ -129,9 +129,9 @@ func (b *Benchmark) Run() {
 }
 
 func (b *Benchmark) runWorker(iterations chan int, waitSync chan int) {
+	// Lets create a new client for each worker.
+	cli := NewClient(b.statsCollector, b.DisableKeepAlives)
 	for _ = range iterations {
-		// Lets create a new client for each worker.
-		cli := NewClient(b.statsCollector, b.DisableKeepAlives)
 		if err := b.flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
