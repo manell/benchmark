@@ -23,7 +23,7 @@ func NewClient(collector chan *Metric, keepAlive bool) *Client {
 	return &Client{Client: client, Collector: collector}
 }
 
-// Do is a wrap in top of http.Client that execute requests and collects metrics
+// Do is a wrap on top of http.Client that execute requests and collects metrics
 func (c *Client) Do(name string, req *http.Request) (*http.Response, error) {
 	startTime := time.Now()
 

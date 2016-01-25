@@ -35,6 +35,7 @@ func (s *Statistics) Run(collector chan *benchmark.Metric, concurrency int) {
 }
 
 func (s *Statistics) Finalize() {
+	<-s.sync
 	for key, times := range s.data {
 		fmt.Printf("Operation: %s\nMethod: %s\nPath: %s\n\n", key.Name, key.Method, key.Path)
 
@@ -59,5 +60,4 @@ func (s *Statistics) Finalize() {
 		fmt.Printf("  50%%  %f \n  65%%  %f\n  75%%  %f\n  85%%  %f\n  90%%  %f\n  95%%  %f\n  99%%  %f\n  100%% %f\n",
 			per50, per65, per75, per85, per90, per95, per99, per100)
 	}
-	<-s.sync
 }
