@@ -1,10 +1,15 @@
 package statistics
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/manell/benchmark"
 	"github.com/montanaflynn/stats"
+)
+
+var (
+	loaded = flag.Bool("stats", false, "Use stats module.")
 )
 
 func init() {
@@ -20,6 +25,8 @@ type Statistics struct {
 	data        map[benchmark.Operation][]float64
 	concurrency int
 }
+
+func (s *Statistics) Loaded() bool { return *loaded }
 
 func (s *Statistics) Run(collector chan *benchmark.Metric, iterations, concurrency int) {
 	s.concurrency = concurrency

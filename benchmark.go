@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	n = flag.Int("n", 1, "number of requests")
-	c = flag.Int("c", 1, "number of concurrent workers")
-	k = flag.Bool("k", false, "reuse TCP connections")
+	n = flag.Int("n", 1, "Number of iterations")
+	c = flag.Int("c", 1, "Number of concurrent workers")
+	k = flag.Bool("k", true, "Reuse TCP connections")
 )
 
 // FlowRunner is an interface that represents the ability to run a workflow.
@@ -84,9 +84,11 @@ func (b *Benchmark) feedConsumers() {
 // Run executes the benchmark.
 func (b *Benchmark) Run() {
 	for _, consumer := range regConsumers {
-		c := make(chan *Metric, 4096)
-		b.statsConsumers = append(b.statsConsumers, c)
-		go consumer.Run(c, b.N, b.C)
+		if consumer.Loaded() {
+			c := make(chan *Metric, 4096)
+			b.statsConsumers = append(b.statsConsumers, c)
+			go consumer.Run(c, b.N, b.C)
+		}
 	}
 
 	// Connect the collector with consumers.
@@ -125,7 +127,9 @@ func (b *Benchmark) Run() {
 
 	// All channels are closed and no more data will be generated.
 	for _, consumer := range regConsumers {
-		consumer.Finalize()
+		if consumer.Loaded() {
+			consumer.Finalize()
+		}
 	}
 }
 

@@ -1,12 +1,17 @@
 package statistics
 
 import (
+	"flag"
 	"image/color"
 
 	"github.com/gonum/plot"
 	"github.com/gonum/plot/plotter"
 	"github.com/gonum/plot/vg"
 	"github.com/manell/benchmark"
+)
+
+var (
+	loaded = flag.Bool("plots", false, "Use plots module.")
 )
 
 func init() {
@@ -30,6 +35,8 @@ type Plots struct {
 	intervalsTps  plotter.XYs
 	concurrency   int
 }
+
+func (s *Plots) Loaded() bool { return *loaded }
 
 func (s *Plots) Run(collector chan *benchmark.Metric, iterations, concurrency int) {
 	s.concurrency = concurrency
