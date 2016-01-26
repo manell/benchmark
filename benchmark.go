@@ -52,37 +52,31 @@ type Benchmark struct {
 	// Dissable TCP connections re-use.
 	DisableKeepAlives bool
 
-	consumers      *Consumers // Change to interface
-	syncFeed       chan int
-	statsCollector chan *Metric
-	flow           FlowRunner
+	consumers *Consumers // Change to interface
 }
 
 // NewBenchmark returns a new instance of Benchmark.
-func NewBenchmark(flow FlowRunner) *Benchmark {
+func NewBenchmark() *Benchmark {
 	flag.Parse()
 
-	statsCollector := make(chan *Metric, 4096)
-
 	bench := &Benchmark{
-		statsCollector:    statsCollector,
-		flow:              flow,
 		C:                 *c,
 		N:                 *n,
 		DisableKeepAlives: !*k,
-		consumers:         consumersRegistry,
-		syncFeed:          make(chan int),
+		consumers:         consumersRegistry, //Should be interface!
 	}
 
 	return bench
 }
 
 // Run executes the benchmark.
-func (b *Benchmark) Run() {
+func (b *Benchmark) Run(flow FlowRunner) {
 	b.consumers.Initialize(b.N, b.C)
 
+	statsOutput := make(chan *Metric, 4096)
+
 	// Connect the collector with consumers.
-	dataSent := b.consumers.Pipe(b.statsCollector)
+	dataSent := b.consumers.Pipe(statsOutput)
 
 	fi := make(chan int, b.N)
 
@@ -90,7 +84,7 @@ func (b *Benchmark) Run() {
 
 	// Start C workers.
 	for j := 0; j < b.C; j++ {
-		go b.runWorker(workerFeed, fi)
+		go b.runWorker(flow, statsOutput, workerFeed, fi)
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -103,9 +97,9 @@ func (b *Benchmark) Run() {
 		<-fi
 	}
 
-	// There are no more metrics to send, so we need to notify the consumers
+	// There are no more metrics to send, so we need to notify the Consumers
 	// that no more data will be sent.
-	close(b.statsCollector)
+	close(statsOutput)
 
 	// Wait until the remaining data is sent to the consumers
 	<-dataSent
@@ -115,11 +109,11 @@ func (b *Benchmark) Run() {
 	b.consumers.Finalize()
 }
 
-func (b *Benchmark) runWorker(iterations chan int, waitSync chan int) {
+func (b *Benchmark) runWorker(flow FlowRunner, output chan *Metric, iterations chan int, waitSync chan int) {
 	// Lets create a new client for each worker.
-	cli := NewClient(b.statsCollector, b.DisableKeepAlives)
+	cli := NewClient(output, b.DisableKeepAlives)
 	for _ = range iterations {
-		if err := b.flow.RunFlow(cli); err != nil {
+		if err := flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
 		waitSync <- 1
