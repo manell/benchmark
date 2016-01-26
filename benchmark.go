@@ -3,13 +3,14 @@ package benchmark
 import (
 	"flag"
 	"log"
+	"sync"
 	"time"
 )
 
 var (
-	n = flag.Int("n", 1, "Number of iterations")
-	c = flag.Int("c", 1, "Number of concurrent workers")
-	k = flag.Bool("k", true, "Reuse TCP connections")
+	n = flag.Int("n", 0, "Number of iterations.")
+	c = flag.Int("c", 1, "Number of concurrent workers.")
+	k = flag.Bool("k", true, "Reuse TCP connections.")
 )
 
 // consumersRegistry contains the available Consumer.
@@ -73,29 +74,12 @@ func NewBenchmark() *Benchmark {
 func (b *Benchmark) Run(flow FlowRunner) {
 	b.consumers.Initialize(b.N, b.C)
 
-	statsOutput := make(chan *Metric, 4096)
+	statsOutput := make(chan *Metric, b.N)
 
 	// Connect the collector with consumers.
 	dataSent := b.consumers.Pipe(statsOutput)
 
-	fi := make(chan int, b.N)
-
-	workerFeed := make(chan int, b.N)
-
-	// Start C workers.
-	for j := 0; j < b.C; j++ {
-		go b.runWorker(flow, statsOutput, workerFeed, fi)
-	}
-
-	for i := 0; i < b.N; i++ {
-		workerFeed <- 1
-	}
-	close(workerFeed)
-
-	// Wait until all requests finalize.
-	for j := 0; j < b.N; j++ {
-		<-fi
-	}
+	b.runNCBenchmark(statsOutput, flow)
 
 	// There are no more metrics to send, so we need to notify the Consumers
 	// that no more data will be sent.
@@ -109,13 +93,31 @@ func (b *Benchmark) Run(flow FlowRunner) {
 	b.consumers.Finalize()
 }
 
-func (b *Benchmark) runWorker(flow FlowRunner, output chan *Metric, iterations chan int, waitSync chan int) {
+func (b *Benchmark) runNCBenchmark(output chan *Metric, flow FlowRunner) {
+	var fi sync.WaitGroup
+	fi.Add(b.N)
+
+	iterations := make(chan int) // Not sure if it must be buffered
+
+	for j := 0; j < b.C; j++ {
+		go b.runWorker(flow, output, iterations, fi)
+	}
+
+	for i := 0; i < b.N; i++ {
+		iterations <- 1
+	}
+	close(iterations)
+
+	fi.Wait()
+}
+
+func (b *Benchmark) runWorker(flow FlowRunner, output chan *Metric, iterations chan int, waitSync sync.WaitGroup) {
 	// Lets create a new client for each worker.
 	cli := NewClient(output, b.DisableKeepAlives)
 	for _ = range iterations {
 		if err := flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
-		waitSync <- 1
+		waitSync.Done()
 	}
 }

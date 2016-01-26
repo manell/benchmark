@@ -52,12 +52,16 @@ func (c *Consumers) Pipe(input chan *Metric) chan int {
 	return done
 }
 
-// 1 to n channel
+// Fan-out channel
 func (c *Consumers) feedConsumers(input chan *Metric, done chan int) {
 	for metric := range input {
 		for _, consumerInput := range c.consumersInputs {
 			consumerInput <- metric
 		}
+	}
+
+	for _, consumerInput := range c.consumersInputs {
+		close(consumerInput)
 	}
 
 	done <- 1
@@ -79,18 +83,9 @@ func (c *Consumers) Register(name string, consumer Consumer) error {
 // Finalize tells to each consumer that no more data will be sent and calls the
 // final action for each consumer.
 func (c *Consumers) Finalize() {
-	// Notify the consumers that no more data will be sent.
-	c.close()
-
 	for _, consumer := range c.registry {
 		if consumer.Loaded() {
 			consumer.Finalize()
 		}
-	}
-}
-
-func (c *Consumers) close() {
-	for _, consumerInput := range c.consumersInputs {
-		close(consumerInput)
 	}
 }
