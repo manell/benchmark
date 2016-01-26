@@ -12,7 +12,7 @@ var (
 	k = flag.Bool("k", true, "Reuse TCP connections")
 )
 
-// consumersRegistry contains the available consumers
+// consumersRegistry contains the available Consumer.
 var consumersRegistry = NewConsumers()
 
 // Register allows registering new consumers with an unique name

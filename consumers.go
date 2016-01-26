@@ -5,21 +5,21 @@ import (
 )
 
 // Consumer is an interface that represents the ability to consume metrics and do
-// some stuff with them
+// some stuff with them.
 type Consumer interface {
 	Loaded() bool
 	Run(chan *Metric, int, int)
 	Finalize()
 }
 
-// Consumers handles the registration and execution of the multiples Consumer
+// Consumers handles the registration and execution of multiple Consumer.
 type Consumers struct {
 	registry        map[string]Consumer
 	consumersInputs []chan *Metric
 	workersOutput   chan *Metric
 }
 
-// NewConsumers returns  a new instance of Consumers
+// NewConsumers returns a new instance of Consumers
 func NewConsumers() *Consumers {
 	registry := make(map[string]Consumer)
 	consumersInputs := []chan *Metric{}
@@ -43,8 +43,8 @@ func (c *Consumers) Initialize(number, concurrency int) {
 	}
 }
 
-// Pipe send the recieved data of the input channel to each consumer. It returns
-// a channel that indicates wether al data has been sent.
+// Pipe sends the recieved data of the input channel to each consumer. It returns
+// a channel that indicates whether al data has been sent.
 func (c *Consumers) Pipe(input chan *Metric) chan int {
 	done := make(chan int)
 	go c.feedConsumers(input, done)
@@ -76,7 +76,7 @@ func (c *Consumers) Register(name string, consumer Consumer) error {
 	return nil
 }
 
-// Finalize tell to each consumer that no more data will be sent and call the
+// Finalize tells to each consumer that no more data will be sent and calls the
 // final action for each consumer.
 func (c *Consumers) Finalize() {
 	// Notify the consumers that no more data will be sent.
