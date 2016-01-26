@@ -100,7 +100,7 @@ func (b *Benchmark) runNCBenchmark(output chan *Metric, flow FlowRunner) {
 	iterations := make(chan int) // Not sure if it must be buffered
 
 	for j := 0; j < b.C; j++ {
-		go b.runWorker(flow, output, iterations, fi)
+		go b.runWorker(flow, output, iterations, &fi)
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -111,13 +111,14 @@ func (b *Benchmark) runNCBenchmark(output chan *Metric, flow FlowRunner) {
 	fi.Wait()
 }
 
-func (b *Benchmark) runWorker(flow FlowRunner, output chan *Metric, iterations chan int, waitSync sync.WaitGroup) {
+func (b *Benchmark) runWorker(flow FlowRunner, output chan *Metric, iterations chan int, waitSync *sync.WaitGroup) {
 	// Lets create a new client for each worker.
 	cli := NewClient(output, b.DisableKeepAlives)
 	for _ = range iterations {
 		if err := flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
+
 		waitSync.Done()
 	}
 }
