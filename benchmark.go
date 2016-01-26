@@ -12,6 +12,16 @@ var (
 	k = flag.Bool("k", true, "Reuse TCP connections")
 )
 
+// consumersRegistry contains the available consumers
+var consumersRegistry = NewConsumers()
+
+// Register allows registering new consumers with an unique name
+func Register(name string, consumer Consumer) {
+	if err := consumersRegistry.Register(name, consumer); err != nil {
+		panic(err)
+	}
+}
+
 // FlowRunner is an interface that represents the ability to run a workflow.
 type FlowRunner interface {
 	RunFlow(*Client) error
@@ -42,57 +52,37 @@ type Benchmark struct {
 	// Dissable TCP connections re-use.
 	DisableKeepAlives bool
 
+	consumers      *Consumers // Change to interface
 	syncFeed       chan int
 	statsCollector chan *Metric
-	statsConsumers []chan *Metric
 	flow           FlowRunner
 }
 
 // NewBenchmark returns a new instance of Benchmark.
 func NewBenchmark(flow FlowRunner) *Benchmark {
 	flag.Parse()
-	statsConsumers := []chan *Metric{}
 
 	statsCollector := make(chan *Metric, 4096)
 
 	bench := &Benchmark{
 		statsCollector:    statsCollector,
-		statsConsumers:    statsConsumers,
 		flow:              flow,
 		C:                 *c,
 		N:                 *n,
 		DisableKeepAlives: !*k,
+		consumers:         consumersRegistry,
 		syncFeed:          make(chan int),
 	}
 
 	return bench
 }
 
-// 1 to n channel
-func (b *Benchmark) feedConsumers() {
-	// Basically it sends the output of a channel to the input of n-channels.
-	for metric := range b.statsCollector {
-		for _, consumer := range b.statsConsumers {
-			consumer <- metric
-		}
-	}
-
-	// Notify that all data has been properly sent to the consumers.
-	b.syncFeed <- 1
-}
-
 // Run executes the benchmark.
 func (b *Benchmark) Run() {
-	for _, consumer := range regConsumers {
-		if consumer.Loaded() {
-			c := make(chan *Metric, 4096)
-			b.statsConsumers = append(b.statsConsumers, c)
-			go consumer.Run(c, b.N, b.C)
-		}
-	}
+	b.consumers.Initialize(b.N, b.C)
 
 	// Connect the collector with consumers.
-	go b.feedConsumers()
+	dataSent := b.consumers.Pipe(b.statsCollector)
 
 	fi := make(chan int, b.N)
 
@@ -113,24 +103,16 @@ func (b *Benchmark) Run() {
 		<-fi
 	}
 
-	// There are no more metrics to send, so we need to notify the feeder
+	// There are no more metrics to send, so we need to notify the consumers
 	// that no more data will be sent.
 	close(b.statsCollector)
 
-	// Wait until the feeder sends all the remaining metrics to the consumers.
-	<-b.syncFeed
+	// Wait until the remaining data is sent to the consumers
+	<-dataSent
 
-	// Notify the consumers that no more data will be sent.
-	for _, channel := range b.statsConsumers {
-		close(channel)
-	}
-
-	// All channels are closed and no more data will be generated.
-	for _, consumer := range regConsumers {
-		if consumer.Loaded() {
-			consumer.Finalize()
-		}
-	}
+	// All channels are closed and no more data will be generated. Lets do some
+	// stuff with the data.
+	b.consumers.Finalize()
 }
 
 func (b *Benchmark) runWorker(iterations chan int, waitSync chan int) {
