@@ -40,7 +40,7 @@ type Metric struct {
 	StartTime time.Time
 	Operation *Operation
 	FinalTime time.Time
-	Duration  float64
+	Duration  time.Duration
 }
 
 type Benchmark struct {
@@ -72,14 +72,19 @@ func NewBenchmark() *Benchmark {
 
 // Run executes the benchmark.
 func (b *Benchmark) Run(flow FlowRunner) {
-	b.Consumers.Initialize(b.N, b.C)
-
+	// This will read metrics.
 	collector := NewCollectStats(b.N)
+
+	//These will consume the metrics.
+	b.Consumers.Initialize(b.N, b.C)
 
 	// Connect the collector with consumers.
 	dataSent := b.Consumers.Pipe(collector.output)
 
+	// Execute the benchmark.
+	start := time.Now()
 	b.runNCBenchmark(flow, collector)
+	elapsed := time.Since(start)
 
 	// There are no more metrics to send, so we need to notify the Consumers
 	// that no more data will be sent.
@@ -90,14 +95,14 @@ func (b *Benchmark) Run(flow FlowRunner) {
 
 	// All channels are closed and no more data will be generated. Lets do some
 	// stuff with the data.
-	b.Consumers.Finalize()
+	b.Consumers.Finalize(elapsed)
 }
 
 func (b *Benchmark) runNCBenchmark(flow FlowRunner, collector *CollectStats) {
 	var fi sync.WaitGroup
 	fi.Add(b.N)
 
-	iterations := make(chan int) // Not sure if it must be buffered
+	iterations := make(chan int, b.N)
 
 	for j := 0; j < b.C; j++ {
 		go b.runWorker(flow, collector, iterations, &fi)

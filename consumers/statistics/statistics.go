@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 
+	"time"
+
 	"github.com/manell/benchmark"
 	"github.com/montanaflynn/stats"
 )
@@ -24,33 +26,51 @@ type Statistics struct {
 	sync        chan int
 	data        map[benchmark.Operation][]float64
 	concurrency int
+	iterations  int
 }
 
 func (s *Statistics) Loaded() bool { return *loaded }
 
 func (s *Statistics) Run(collector chan *benchmark.Metric, iterations, concurrency int) {
 	s.concurrency = concurrency
+	s.iterations = iterations
 
 	for metric := range collector {
-		s.data[*metric.Operation] = append(s.data[*metric.Operation], metric.Duration)
+		s.data[*metric.Operation] = append(s.data[*metric.Operation], float64(metric.Duration.Nanoseconds())/1e6)
 	}
 	s.sync <- 1
 }
 
-func (s *Statistics) Finalize() {
+func (s *Statistics) Finalize(d time.Duration) {
 	<-s.sync
 	for key, times := range s.data {
 		fmt.Printf("Operation: %s\nMethod: %s\nPath: %s\n\n", key.Name, key.Method, key.Path)
 
+		rps := float64(s.iterations) / d.Seconds()
+		fmt.Println(len(times))
+		fmt.Printf("Requests per second: %f [#/ms] (mean)\n", rps)
+
 		mean, _ := stats.Mean(times)
 		meanConc := mean / float64(s.concurrency)
-		rps := 1 / (meanConc / 1e3)
+		rps = 1 / meanConc
 
-		fmt.Printf("Requests per second: %f [#/ms] (mean)\n", rps)
+		fmt.Printf("Requests per second: %f [#/ms] (mean)\n", rps*1e3)
 
 		fmt.Printf("Time per request: %f [ms] (mean)\n", mean)
 
 		fmt.Printf("Time per request: %f [ms] (mean across all concurrent requests)\n\n", meanConc)
+
+		max, _ := stats.Max(times)
+		fmt.Printf("Slowest: %f [ms]\n", max)
+
+		min, _ := stats.Min(times)
+		fmt.Printf("Fastest: %f [ms]\n\n", min)
+
+		sum, _ := stats.Sum(times)
+		fmt.Printf("Sum: %f [ms]\n\n", (sum/1e3)/float64(s.concurrency))
+
+		fmt.Printf("Time taken: %f [s]\n\n", d.Seconds())
+
 		fmt.Println("Percentage of the requests served within a certain time (ms)")
 		per50, _ := stats.PercentileNearestRank(times, 50)
 		per65, _ := stats.PercentileNearestRank(times, 65)

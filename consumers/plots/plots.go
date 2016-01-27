@@ -4,6 +4,8 @@ import (
 	"flag"
 	"image/color"
 
+	"time"
+
 	"github.com/gonum/plot"
 	"github.com/gonum/plot/plotter"
 	"github.com/gonum/plot/vg"
@@ -49,12 +51,12 @@ func (s *Plots) Run(collector chan *benchmark.Metric, iterations, concurrency in
 			Y float64
 		}{
 			X: (float64(metric.FinalTime.UnixNano()) - s.start) / 1e9,
-			Y: metric.Duration,
+			Y: float64(metric.Duration.Nanoseconds()) / 1e6,
 		}
 
 		s.points = append(s.points, p)
 
-		s.intervalLat += metric.Duration
+		s.intervalLat += float64(metric.Duration.Nanoseconds()) / 1e6
 		s.intervalCount++
 
 		if s.intervalCount >= float64(iterations/400) {
@@ -131,7 +133,7 @@ func (s *Plots) DrawTps() {
 	}
 }
 
-func (s *Plots) Finalize() {
+func (s *Plots) Finalize(d time.Duration) {
 	p, err := plot.New()
 	if err != nil {
 		panic(err)

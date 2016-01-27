@@ -23,14 +23,13 @@ func (c *CollectStats) NewMeasure(op *Operation) func() {
 	final := func() {
 		finalTime := time.Now()
 
-		duration := finalTime.UnixNano() - startTime.UnixNano()
-		durationMs := float64(duration) / float64(time.Millisecond)
+		duration := time.Since(startTime)
 
 		stat := &Metric{
 			StartTime: startTime,
 			Operation: op,
 			FinalTime: finalTime,
-			Duration:  durationMs,
+			Duration:  duration,
 		}
 
 		c.output <- stat
