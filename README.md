@@ -126,6 +126,7 @@ If we want to process the metrics and show the results, we need to import a repo
 import _ "github.com/manell/benchmark/consumers/report"
 ```
 Then we need to add an additional extra flag ```-report```, so the command will be:
+
 ```$ go run main.go -n 1000 -c 8 - report```
 
 The final result will be something similiar to the Apache benchmark ouput:
