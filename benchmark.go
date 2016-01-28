@@ -120,14 +120,9 @@ func (b *Benchmark) runWorker(flow FlowRunner, collector *CollectStats, iteratio
 	// Lets create a new client for each worker.
 	cli := NewClient(collector, b.DisableKeepAlives)
 	for _ = range iterations {
-		measure := collector.NewMeasure(&Operation{Name: "Flow"})
-
 		if err := flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
 		}
-
-		measure()
-
 		waitSync.Done()
 	}
 }
