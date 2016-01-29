@@ -38,8 +38,8 @@ func (s *Live) Run(collector chan *benchmark.Metric, iterations, concurrency int
 	go s.Print()
 	for metric := range collector {
 		<-s.sync
-		s.count[metric.Operation.Name] += 1
-		s.countLat[metric.Operation.Name] += float64(metric.Duration.Nanoseconds())
+		s.count[metric.Name] += 1
+		s.countLat[metric.Name] += float64(metric.Duration.Nanoseconds())
 		s.sync <- 1
 	}
 	s.ticker.Stop()

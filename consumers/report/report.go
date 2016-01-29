@@ -19,7 +19,7 @@ func init() {
 	sync := make(chan int, 1)
 	benchmark.Register("report", &Report{
 		sync:    sync,
-		metrics: make(map[benchmark.Operation]*MetricList),
+		metrics: make(map[string]*MetricList),
 	})
 }
 
@@ -29,13 +29,14 @@ type MetricList struct {
 	avgLats      float64
 	tps          float64
 	op           *benchmark.Operation
+	name         string
 	concurrency  int
 	requests     int
 	timeTaken    time.Duration
 }
 
 func (m *MetricList) Print() {
-	fmt.Printf("Operation: %s\nMethod: %s\nPath: %s\n\n", m.op.Name, m.op.Method, m.op.Path)
+	fmt.Printf("Name: %s\nMethod: %s\nHost: %s\nPath: %s\n\n", m.name, m.op.Method, m.op.Host, m.op.Path)
 
 	fmt.Printf("Concurrency Level: %d\n", m.concurrency)
 	fmt.Printf("Time taken for tests %f seconds\n", m.timeTaken.Seconds())
@@ -70,7 +71,7 @@ type Report struct {
 	sync    chan int
 	n       int
 	c       int
-	metrics map[benchmark.Operation]*MetricList
+	metrics map[string]*MetricList
 }
 
 func (r *Report) Loaded() bool { return *loaded }
@@ -80,13 +81,16 @@ func (r *Report) Run(collector chan *benchmark.Metric, iterations, concurrency i
 	r.c = concurrency
 
 	for m := range collector {
-		if r.metrics[*m.Operation] == nil {
-			r.metrics[*m.Operation] = &MetricList{}
+		if r.metrics[m.Name] == nil {
+			r.metrics[m.Name] = &MetricList{
+				op:   m.Operation,
+				name: m.Name,
+			}
 		}
 
 		durationMs := float64(m.Duration.Nanoseconds()) / 1e6
-		r.metrics[*m.Operation].latencies = append(r.metrics[*m.Operation].latencies, durationMs)
-		r.metrics[*m.Operation].avgLatsTotal += durationMs
+		r.metrics[m.Name].latencies = append(r.metrics[m.Name].latencies, durationMs)
+		r.metrics[m.Name].avgLatsTotal += durationMs
 	}
 
 	r.sync <- 1
@@ -95,11 +99,10 @@ func (r *Report) Run(collector chan *benchmark.Metric, iterations, concurrency i
 func (r *Report) Finalize(d time.Duration) {
 	<-r.sync
 
-	for op, m := range r.metrics {
+	for _, m := range r.metrics {
 		m.avgLats = m.avgLatsTotal / float64(len(m.latencies))
 		m.tps = float64(len(m.latencies)) / d.Seconds()
 		sort.Float64s(m.latencies)
-		m.op = &op
 		m.requests = r.n
 		m.concurrency = r.c
 		m.timeTaken = d

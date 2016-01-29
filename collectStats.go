@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"net/http"
 	"time"
 )
 
@@ -17,8 +18,17 @@ func NewCollectStats(n int) *CollectStats {
 
 // NewMeasure starts a new stats measure and returns a function to finalize
 // the measure. The result will be sent to the CollectStats output channel.
-func (c *CollectStats) NewMeasure(op *Operation) func() {
+func (c *CollectStats) NewMeasure(name string, req *http.Request) func() {
 	startTime := time.Now()
+
+	op := &Operation{}
+	if req != nil {
+		op = &Operation{
+			Host:   req.URL.Host,
+			Method: req.Method,
+			Path:   req.URL.Path,
+		}
+	}
 
 	final := func() {
 		finalTime := time.Now()
@@ -26,6 +36,7 @@ func (c *CollectStats) NewMeasure(op *Operation) func() {
 		duration := time.Since(startTime)
 
 		stat := &Metric{
+			Name:      name,
 			StartTime: startTime,
 			Operation: op,
 			FinalTime: finalTime,

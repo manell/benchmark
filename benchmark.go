@@ -30,9 +30,9 @@ type FlowRunner interface {
 
 // Operation contains information about an HTTP request.
 type Operation struct {
-	Name   string
 	Method string
 	Path   string
+	Host   string
 }
 
 // Metric contains information about an HTTP request.
@@ -41,6 +41,7 @@ type Metric struct {
 	Operation *Operation
 	FinalTime time.Time
 	Duration  time.Duration
+	Name      string
 }
 
 type Benchmark struct {
