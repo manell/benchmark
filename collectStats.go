@@ -10,10 +10,9 @@ type CollectStats struct {
 	output chan *Metric
 }
 
-// NewCollector returns a new instance of CollectStats.
-func NewCollectStats(n int) *CollectStats {
-	c := &CollectStats{output: make(chan *Metric, n)}
-	return c
+// Initialize sets its channel
+func (c *CollectStats) Initialize(ouput chan *Metric) {
+	c.output = ouput
 }
 
 // NewMeasure starts a new stats measure and returns a function to finalize

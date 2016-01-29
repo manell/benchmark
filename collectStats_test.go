@@ -6,7 +6,8 @@ import (
 )
 
 func TestNewMeasure(t *testing.T) {
-	cs := NewCollectStats(10)
+	cs := &CollectStats{}
+	cs.Initialize(make(chan *Metric, 10))
 
 	tests := []struct {
 		name   string

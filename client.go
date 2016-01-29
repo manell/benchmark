@@ -6,12 +6,12 @@ import (
 
 // BenchClient contains helpers for measuring metrics and executing HTTP requests.
 type BenchClient struct {
-	Collector *CollectStats
+	Collector collector
 	Client    *http.Client
 }
 
 //  NewClient returns a new instance of a BenchClient
-func NewClient(collector *CollectStats, keepAlive bool) *BenchClient {
+func NewClient(collector collector, keepAlive bool) *BenchClient {
 	tp := &http.Transport{
 		MaxIdleConnsPerHost: 16,
 		DisableKeepAlives:   keepAlive,

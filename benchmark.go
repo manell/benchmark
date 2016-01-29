@@ -3,6 +3,7 @@ package benchmark
 import (
 	"flag"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -16,7 +17,7 @@ var (
 // consumersRegistry contains the available Consumer.
 var consumersRegistry = NewConsumers()
 
-// Register allows registering new consumers with an unique name
+// Register allows registering new consumers with an unique name.
 func Register(name string, consumer Consumer) {
 	if err := consumersRegistry.Register(name, consumer); err != nil {
 		panic(err)
@@ -26,6 +27,17 @@ func Register(name string, consumer Consumer) {
 // FlowRunner is an interface that represents the ability to run a workflow.
 type FlowRunner interface {
 	RunFlow(*BenchClient) error
+}
+
+type consumersManager interface {
+	Initialize(int, int)
+	Pipe(chan *Metric) chan int
+	Finalize(time.Duration)
+}
+
+type collector interface {
+	Initialize(chan *Metric)
+	NewMeasure(string, *http.Request) func()
 }
 
 // Operation contains information about an HTTP request.
@@ -54,7 +66,8 @@ type Benchmark struct {
 	// Dissable TCP connections re-use.
 	DisableKeepAlives bool
 
-	Consumers *Consumers // Change to interface?
+	Consumers consumersManager
+	Collector collector
 }
 
 // NewBenchmark returns a new instance of Benchmark.
@@ -65,7 +78,8 @@ func NewBenchmark() *Benchmark {
 		C:                 *c,
 		N:                 *n,
 		DisableKeepAlives: !*k,
-		Consumers:         consumersRegistry, //Should be interface!,
+		Consumers:         consumersRegistry,
+		Collector:         &CollectStats{},
 	}
 
 	return bench
@@ -73,23 +87,22 @@ func NewBenchmark() *Benchmark {
 
 // Run executes the benchmark.
 func (b *Benchmark) Run(flow FlowRunner) {
-	// This will read metrics.
-	collector := NewCollectStats(b.N)
+	ouput := make(chan *Metric, b.N)
+	b.Collector.Initialize(ouput)
 
 	//These will consume the metrics.
 	b.Consumers.Initialize(b.N, b.C)
 
 	// Connect the collector with consumers.
-	dataSent := b.Consumers.Pipe(collector.output)
+	dataSent := b.Consumers.Pipe(ouput)
 
 	// Execute the benchmark.
 	start := time.Now()
-	b.runNCBenchmark(flow, collector)
+	b.runNCBenchmark(flow)
 	elapsed := time.Since(start)
 
-	// There are no more metrics to send, so we need to notify the Consumers
-	// that no more data will be sent.
-	collector.close()
+	// There are no more metrics to send.
+	close(ouput)
 
 	// Wait until the remaining data is sent to the consumers
 	<-dataSent
@@ -99,14 +112,14 @@ func (b *Benchmark) Run(flow FlowRunner) {
 	b.Consumers.Finalize(elapsed)
 }
 
-func (b *Benchmark) runNCBenchmark(flow FlowRunner, collector *CollectStats) {
+func (b *Benchmark) runNCBenchmark(flow FlowRunner) {
 	var fi sync.WaitGroup
 	fi.Add(b.N)
 
 	iterations := make(chan int, b.N)
 
 	for j := 0; j < b.C; j++ {
-		go b.runWorker(flow, collector, iterations, &fi)
+		go b.runWorker(flow, iterations, &fi)
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -117,9 +130,9 @@ func (b *Benchmark) runNCBenchmark(flow FlowRunner, collector *CollectStats) {
 	fi.Wait()
 }
 
-func (b *Benchmark) runWorker(flow FlowRunner, collector *CollectStats, iterations chan int, waitSync *sync.WaitGroup) {
+func (b *Benchmark) runWorker(flow FlowRunner, iterations chan int, waitSync *sync.WaitGroup) {
 	// Lets create a new client for each worker.
-	cli := NewClient(collector, b.DisableKeepAlives)
+	cli := NewClient(b.Collector, b.DisableKeepAlives)
 	for _ = range iterations {
 		if err := flow.RunFlow(cli); err != nil {
 			log.Fatal(err)
