@@ -51,4 +51,6 @@ func TestNewMeasure(t *testing.T) {
 			t.Fatal("Invalid path")
 		}
 	}
+
+	cs.close()
 }
