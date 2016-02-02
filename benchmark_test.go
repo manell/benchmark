@@ -25,8 +25,14 @@ func (m *mockCollector) NewMeasure(string, *http.Request) func() { return func()
 type mockFlow struct {
 	n     int
 	mutex *sync.Mutex
+	init  bool
 }
 
+func (m *mockFlow) Initialize(opts *InitParameters) error {
+	m.init = true
+
+	return nil
+}
 func (m *mockFlow) RunFlow(cli *BenchClient) error {
 	m.mutex.Lock()
 	m.n++
@@ -58,11 +64,15 @@ func TestBencharkNC(t *testing.T) {
 			Collector:         &mockCollector{},
 		}
 
-		flow := &mockFlow{0, &sync.Mutex{}}
+		flow := &mockFlow{0, &sync.Mutex{}, false}
 		b.Run(flow)
 
 		if flow.n != test.n {
 			t.Fatal("Incorrect iterations value")
+		}
+
+		if !flow.init {
+			t.Fatal("Initialize not executed")
 		}
 	}
 }

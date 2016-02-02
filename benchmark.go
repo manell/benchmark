@@ -24,9 +24,15 @@ func Register(name string, consumer Consumer) {
 	}
 }
 
+// InitParameters is the info passed to the initialization function.
+type InitParameters struct {
+	N int
+}
+
 // FlowRunner is an interface that represents the ability to run a workflow.
 type FlowRunner interface {
 	RunFlow(*BenchClient) error
+	Initialize(*InitParameters) error
 }
 
 type consumersManager interface {
@@ -87,6 +93,13 @@ func NewBenchmark() *Benchmark {
 
 // Run executes the benchmark.
 func (b *Benchmark) Run(flow FlowRunner) {
+	params := &InitParameters{
+		N: b.N,
+	}
+	if err := flow.Initialize(params); err != nil {
+		log.Fatal(err)
+	}
+
 	ouput := make(chan *Metric, b.N)
 	b.Collector.Initialize(ouput)
 
