@@ -12,6 +12,7 @@ piece of code that sends a single HTTP requests or a complex code which sends se
 must implement the FlowRunner interface:
 ```go
 type FlowRunner interface {
+	Initialize(*InitParameters) error
 	RunFlow(*BenchClient) error
 }
 ```
@@ -24,6 +25,7 @@ import (
 
 type Flow struct{}
 
+func (f *Flow) Initialize(params *benchmark.InitParameters) error { return nil }
 func (f *Flow) RunFlow(cli *benchmark.BenchClient) error { return nil }
 ```
 This Flow, however, is very simple and it does nothing, so we need to code some logic to do an HTTP request. 
@@ -63,6 +65,8 @@ import (
 )
 
 type Flow struct{}
+
+func (f *Flow) Initialize(params *benchmark.InitParameters) error { return nil }
 
 func (f *Flow) RunFlow(cli *benchmark.BenchClient) error {
 	req, err := http.NewRequest("GET", "http://127.0.0.1:8081/", nil)
