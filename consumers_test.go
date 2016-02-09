@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// MockConsumer is a mock that helps to vallidate the intializations of
+// consumers
 type MockConsumer struct {
 	load     bool
 	finalize bool
@@ -24,6 +26,7 @@ func (mc *MockConsumer) Run(input chan *Metric, n int, c int) {
 
 func (mc *MockConsumer) Finalize(d time.Duration) { mc.duration = &d }
 
+// MockConsumer2 is a mock that helps to validate the consumption of metrics
 type MockConsumer2 struct {
 	data    *Metric
 	loadRun chan int
@@ -82,7 +85,7 @@ func TestFinalize(t *testing.T) {
 	cons.Finalize(time.Second * 1)
 
 	if *mc2.duration != time.Second*1 {
-		t.Fatal("Duration incorrect")
+		t.Fatal("Incorrect duration")
 	}
 	if mc.duration != nil {
 		t.Fatal("Duration should be nil")
@@ -111,9 +114,9 @@ func TestPipe(t *testing.T) {
 	mc2.Finalize(time.Second * 1)
 
 	if mc1.data.Name != name {
-		t.Fatal("mc1 has not recived the metric")
+		t.Fatal("mc1 has not received the metric")
 	}
 	if mc2.data.Name != name {
-		t.Fatal("mc2 has not recived the metric")
+		t.Fatal("mc2 has not received the metric")
 	}
 }
