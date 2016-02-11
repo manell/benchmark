@@ -3,6 +3,8 @@ package live
 import (
 	"flag"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/manell/benchmark"
@@ -13,55 +15,71 @@ var (
 )
 
 func init() {
-	benchmark.Register("live", &Live{
-		count:    make(map[string]int),
-		ticker:   time.NewTicker(time.Second * 1),
-		countLat: make(map[string]float64),
-		sync:     make(chan int, 1),
-	})
+	benchmark.Register("live", &Live{})
 }
 
-type Live struct {
-	count       map[string]int
-	countLat    map[string]float64
-	ticker      *time.Ticker
-	concurrency int
-	sync        chan int
+// LiveMetric calculates and prints statistics
+type LiveMetric struct {
+	count    map[string]int
+	countLat map[string]float64
+	c        int
+	sync.RWMutex
 }
+
+// Read computes a new metric
+func (lm *LiveMetric) Read(metric *benchmark.Metric) {
+	lm.Lock()
+	defer lm.Unlock()
+
+	lm.count[metric.Name] += 1
+	lm.countLat[metric.Name] += float64(metric.Duration.Nanoseconds())
+}
+
+// Print prints the available metrics and resets the counters
+func (lm *LiveMetric) Print() {
+	var keys []string
+	for k := range lm.count {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, op := range keys {
+		lm.RLock()
+		lat := (lm.countLat[op] / float64(lm.count[op])) / (1e6 * float64(lm.c))
+
+		fmt.Printf("%s: %.3f [ms] ", op, lat)
+		lm.count[op] = 0
+		lm.countLat[op] = 0
+		lm.RUnlock()
+	}
+	fmt.Println()
+}
+
+// Live is a consumer that periodically print statistics using the recieved metrics.
+type Live struct{}
 
 func (s *Live) Loaded() bool { return *loaded }
 
 func (s *Live) Run(collector chan *benchmark.Metric, iterations, concurrency int) {
-	s.concurrency = concurrency
-	s.sync <- 1
+	ticker := time.NewTicker(time.Second * 1)
+	defer ticker.Stop()
 
-	go s.Print()
-	for metric := range collector {
-		<-s.sync
-		s.count[metric.Name] += 1
-		s.countLat[metric.Name] += float64(metric.Duration.Nanoseconds())
-		s.sync <- 1
+	lm := &LiveMetric{
+		count:    make(map[string]int),
+		countLat: make(map[string]float64),
+		c:        concurrency,
 	}
-	s.ticker.Stop()
-}
 
-func (s *Live) Print() {
 	go func() {
-		for _ = range s.ticker.C {
-			for op, _ := range s.count {
-				<-s.sync
-				lat := (s.countLat[op] / float64(s.count[op])) / 1e9
-				fmt.Printf("%d TPS   %d TPS  %d TPS   %f\n",
-					s.count[op], int((1/lat)*float64(s.concurrency)),
-					int((1/lat)*float64(s.concurrency))-s.count[op],
-					lat*1e9)
-				s.count[op] = 0
-				s.countLat[op] = 0
-				s.sync <- 1
-			}
+		for _ = range ticker.C {
+			lm.Print()
 		}
 	}()
 
+	for metric := range collector {
+		lm.Read(metric)
+	}
 }
 
+// Finalize does nothing. (needed to implement the consumer interface)
 func (s *Live) Finalize(d time.Duration) {}
