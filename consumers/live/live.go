@@ -47,7 +47,7 @@ func (lm *LiveMetric) Print() {
 		lm.RLock()
 		lat := (lm.countLat[op] / float64(lm.count[op])) / (1e6 * float64(lm.c))
 
-		fmt.Printf("%s: %.3f [ms] ", op, lat)
+		fmt.Printf("%s: %.3f [ms]  %f [req/s]", op, lat, (1/lat)*1000)
 		lm.count[op] = 0
 		lm.countLat[op] = 0
 		lm.RUnlock()

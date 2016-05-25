@@ -128,12 +128,12 @@ func (s *Plots) DrawTps() {
 	p.Legend.Add("line", l)
 
 	// Save the plot to a PNG file.
-	if err := p.Save(128*vg.Inch, 32*vg.Inch, "tps.png"); err != nil {
+	if err := p.Save(128*vg.Inch, 32*vg.Inch, "tps.svg"); err != nil {
 		panic(err)
 	}
 }
 
-func (s *Plots) Finalize(d time.Duration) {
+func (s *Plots) DrawLats() {
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
@@ -166,10 +166,12 @@ func (s *Plots) Finalize(d time.Duration) {
 	p.Legend.Add("line", l)
 
 	// Save the plot to a PNG file.
-	if err := p.Save(128*vg.Inch, 24*vg.Inch, "points.png"); err != nil {
+	if err := p.Save(64*vg.Inch, 24*vg.Inch, "points.png"); err != nil {
 		panic(err)
 	}
+}
 
+func (s *Plots) Finalize(d time.Duration) {
 	s.DrawTps()
 
 	<-s.sync
